@@ -3,31 +3,12 @@ import time
 import uvicorn
 import os
 import os.path
-import pwd
-import grp
-import stat
+
 
 DEFAULT_ALARM_TIME = {"alarm_time": "9:00"}
 SLEEPS_LOG_PATH = os.getenv("SLEEPS_LOG_PATH", "data/sleeps.log")
 
 app = FastAPI()
-
-
-def check_permissions(path):
-    if not os.access(path, os.R_OK):
-        user = pwd.getpwuid(os.getuid()).pw_name
-        group = grp.getgrgid(os.getgid()).gr_name
-        # Get file status
-        file_stat = os.stat(path)
-
-        # Get permissions in octal format
-        permissions_octal = oct(file_stat.st_mode & 0o777)
-
-        # Get permissions in human-readable format
-        permissions_human = stat.filemode(file_stat.st_mode)
-        
-        raise PermissionError(f"Permission denied for {path}. Running as user: {user}, group: {group}. File permissions (octal) {permissions_octal}. Human {permissions_human}")
-    return True
 
 
 @app.get("/")
@@ -68,8 +49,8 @@ async def latest_sleep():
     return {"latest_sleep": last_line}
 
 
-@app.get("/alarm/time")
-async def alarm_time(date: float):
+@app.get("/alarm/time/{date}")
+async def alarm_time(date: str):
     slept_at = await latest_sleep()
 
     if slept_at is None or "latest_sleep" not in slept_at:
@@ -77,7 +58,7 @@ async def alarm_time(date: float):
 
     # get 24 hour time from seconds from epoch
     slept_clock_time = time.localtime(float(slept_at["latest_sleep"]))
-    requested_date = time.localtime(date)
+    requested_date = time.strptime(date, "%Y%m%d")
 
     if (requested_date.tm_hour > 9
             or slept_clock_time.tm_yday >= requested_date.tm_yday
@@ -92,6 +73,8 @@ async def alarm_time(date: float):
         else:
             return DEFAULT_ALARM_TIME
         return { "alarm_time": f"{calc_alarm_time}:00"}
+
+    return {"message":"shouldn't be here"}
 
 
 def start():
