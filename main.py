@@ -18,7 +18,7 @@ def check_permissions(path):
         user = pwd.getpwuid(os.getuid()).pw_name
         group = grp.getgrgid(os.getgid()).gr_name
         # Get file status
-        file_stat = os.stat(file_path)
+        file_stat = os.stat(path)
 
         # Get permissions in octal format
         permissions_octal = oct(file_stat.st_mode & 0o777)
