@@ -13,7 +13,7 @@ app = FastAPI()
 
 
 def check_permissions(path):
-    if not os.access(path, os.R_OK | os.W_OK):
+    if not os.access(path, os.R_OK):
         user = pwd.getpwuid(os.getuid()).pw_name
         group = grp.getgrgid(os.getgid()).gr_name
         raise PermissionError(f"Permission denied for {path}. Running as user: {user}, group: {group}")
