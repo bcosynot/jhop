@@ -29,18 +29,34 @@
               }
           );
         };
+        myenv = { poetry2nix, lib }: poetry2nix.mkPoetryEnv {
+          projectDir = self;
+          overrides = poetry2nix.overrides.withDefaults (final: super:
+            lib.mapAttrs
+              (attr: systems: super.${attr}.overridePythonAttrs
+                (old: {
+                  nativeBuildInputs = (old.nativeBuildInputs or [ ]) ++ map (a: final.${a}) systems;
+                }))
+              {
+                # https://github.com/nix-community/poetry2nix/blob/master/docs/edgecases.md#modulenotfounderror-no-module-named-packagename
+                # package = [ "setuptools" ];
+              }
+          );
+        };
         pkgs = import nixpkgs {
           inherit system;
           overlays = [
             poetry2nix.overlays.default
             (final: _: {
               myapp = final.callPackage myapp { };
+              myenv = final.callPackage myenv { };
             })
           ];
         };
       in
       {
         packages.default = pkgs.myapp;
+        packages.myenv = pkgs.myenv;
         devShells = {
           # Shell for app dependencies.
           #
