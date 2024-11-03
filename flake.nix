@@ -31,6 +31,9 @@
         };
         myenv = { poetry2nix, lib }: poetry2nix.mkPoetryEnv {
           projectDir = self;
+          editablePackageSources = {
+            jhop = ./.;
+          };
           overrides = poetry2nix.overrides.withDefaults (final: super:
             lib.mapAttrs
               (attr: systems: super.${attr}.overridePythonAttrs
