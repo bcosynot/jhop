@@ -16,8 +16,7 @@ def check_permissions(path):
     if not os.access(path, os.R_OK | os.W_OK):
         user = pwd.getpwuid(os.getuid()).pw_name
         group = grp.getgrgid(os.getgid()).gr_name
-        print(f"Permission denied for {path}. Running as user: {user}, group: {group}")
-        return False
+        raise PermissionError(f"Permission denied for {path}. Running as user: {user}, group: {group}")
     return True
 
 
@@ -34,8 +33,7 @@ async def say_hello(name: str):
 @app.post("/sleep")
 async def sleep():
     slept_at = time.time()
-    if not check_permissions(SLEEPS_LOG_PATH):
-        return {"message": "Permission denied"}
+    check_permissions(SLEEPS_LOG_PATH)
     if not os.path.exists(SLEEPS_LOG_PATH):
         os.makedirs(os.path.dirname(SLEEPS_LOG_PATH), exist_ok=True)
         open(SLEEPS_LOG_PATH, 'a').close()
@@ -46,8 +44,7 @@ async def sleep():
 
 @app.get("/sleep/latest")
 async def latest_sleep():
-    if not check_permissions(SLEEPS_LOG_PATH):
-        return {"latest_sleep": None}
+    check_permissions(SLEEPS_LOG_PATH)
     if not os.path.exists(SLEEPS_LOG_PATH):
         os.makedirs(os.path.dirname(SLEEPS_LOG_PATH), exist_ok=True)
         open(SLEEPS_LOG_PATH, 'a').close()
