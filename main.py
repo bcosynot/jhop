@@ -3,11 +3,22 @@ import time
 import uvicorn
 import os
 import os.path
+import pwd
+import grp
 
 DEFAULT_ALARM_TIME = {"alarm_time": "9:00"}
 SLEEPS_LOG_PATH = os.getenv("SLEEPS_LOG_PATH", "data/sleeps.log")
 
 app = FastAPI()
+
+
+def check_permissions(path):
+    if not os.access(path, os.R_OK | os.W_OK):
+        user = pwd.getpwuid(os.getuid()).pw_name
+        group = grp.getgrgid(os.getgid()).gr_name
+        print(f"Permission denied for {path}. Running as user: {user}, group: {group}")
+        return False
+    return True
 
 
 @app.get("/")
@@ -23,6 +34,8 @@ async def say_hello(name: str):
 @app.post("/sleep")
 async def sleep():
     slept_at = time.time()
+    if not check_permissions(SLEEPS_LOG_PATH):
+        return {"message": "Permission denied"}
     if not os.path.exists(SLEEPS_LOG_PATH):
         os.makedirs(os.path.dirname(SLEEPS_LOG_PATH), exist_ok=True)
         open(SLEEPS_LOG_PATH, 'a').close()
@@ -33,6 +46,8 @@ async def sleep():
 
 @app.get("/sleep/latest")
 async def latest_sleep():
+    if not check_permissions(SLEEPS_LOG_PATH):
+        return {"latest_sleep": None}
     if not os.path.exists(SLEEPS_LOG_PATH):
         os.makedirs(os.path.dirname(SLEEPS_LOG_PATH), exist_ok=True)
         open(SLEEPS_LOG_PATH, 'a').close()
