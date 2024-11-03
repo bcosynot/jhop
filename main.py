@@ -5,6 +5,7 @@ import os
 import os.path
 import pwd
 import grp
+import stat
 
 DEFAULT_ALARM_TIME = {"alarm_time": "9:00"}
 SLEEPS_LOG_PATH = os.getenv("SLEEPS_LOG_PATH", "data/sleeps.log")
@@ -16,7 +17,16 @@ def check_permissions(path):
     if not os.access(path, os.R_OK):
         user = pwd.getpwuid(os.getuid()).pw_name
         group = grp.getgrgid(os.getgid()).gr_name
-        raise PermissionError(f"Permission denied for {path}. Running as user: {user}, group: {group}")
+        # Get file status
+        file_stat = os.stat(file_path)
+
+        # Get permissions in octal format
+        permissions_octal = oct(file_stat.st_mode & 0o777)
+
+        # Get permissions in human-readable format
+        permissions_human = stat.filemode(file_stat.st_mode)
+        
+        raise PermissionError(f"Permission denied for {path}. Running as user: {user}, group: {group}. File permissions (octal) {permissions_octal}. Human {permissions_human}")
     return True
 
 
