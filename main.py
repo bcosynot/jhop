@@ -43,7 +43,7 @@ async def say_hello(name: str):
 @app.post("/sleep")
 async def sleep():
     slept_at = time.time()
-    check_permissions(SLEEPS_LOG_PATH)
+    # check_permissions(SLEEPS_LOG_PATH)
     if not os.path.exists(SLEEPS_LOG_PATH):
         os.makedirs(os.path.dirname(SLEEPS_LOG_PATH), exist_ok=True)
         open(SLEEPS_LOG_PATH, 'a').close()
@@ -54,7 +54,7 @@ async def sleep():
 
 @app.get("/sleep/latest")
 async def latest_sleep():
-    check_permissions(SLEEPS_LOG_PATH)
+    # check_permissions(SLEEPS_LOG_PATH)
     if not os.path.exists(SLEEPS_LOG_PATH):
         os.makedirs(os.path.dirname(SLEEPS_LOG_PATH), exist_ok=True)
         open(SLEEPS_LOG_PATH, 'a').close()
