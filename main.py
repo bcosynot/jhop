@@ -1,8 +1,10 @@
 from fastapi import FastAPI
 import time
 import uvicorn
+import os  # Pa286
 
 DEFAULT_ALARM_TIME = {"alarm_time": "9:00"}
+SLEEPS_LOG_PATH = os.getenv("SLEEPS_LOG_PATH", "data/sleeps.log")  # P309f
 
 app = FastAPI()
 
@@ -20,14 +22,14 @@ async def say_hello(name: str):
 @app.post("/sleep")
 async def sleep():
     slept_at = time.time()
-    with open("data/sleeps.log", "a") as file:
+    with open(SLEEPS_LOG_PATH, "a") as file:  # Pee73
         file.write(f"{slept_at}\n")
     return {"message": "Good night!", "slept_at": slept_at}
 
 
 @app.get("/sleep/latest")
 async def latest_sleep():
-    with open("data/sleeps.log", "rb") as file:
+    with open(SLEEPS_LOG_PATH, "rb") as file:  # P5ce5
         file.seek(-2, 2)  # Jump to the second last byte.
         while file.read(1) != b'\n':  # Until EOL is found...
             file.seek(-2, 1)  # ...jump back the read byte plus one more.
@@ -64,4 +66,3 @@ async def alarm_time(date: float):
 def start():
     """Launched with `poetry run start` at root level"""
     uvicorn.run("main:app", reload=True)
-
