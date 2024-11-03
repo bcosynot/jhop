@@ -36,6 +36,8 @@ async def latest_sleep():
     if not os.path.exists(SLEEPS_LOG_PATH):
         os.makedirs(os.path.dirname(SLEEPS_LOG_PATH), exist_ok=True)
         open(SLEEPS_LOG_PATH, 'a').close()
+    if os.path.getsize(SLEEPS_LOG_PATH) < 2:
+        return {"latest_sleep": None}
     with open(SLEEPS_LOG_PATH, "rb") as file:
         file.seek(-2, 2)  # Jump to the second last byte.
         while file.read(1) != b'\n':  # Until EOL is found...
