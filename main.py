@@ -69,10 +69,10 @@ async def alarm_time(date: str):
         if 9 <= slept_hour <= 23:
             calc_alarm_time = "6:30"
         elif slept_hour >= 0 and (slept_hour + 7) < 9:
-            calc_alarm_time = slept_hour + 7
+            calc_alarm_time = f"{slept_hour + 7}:00"
         else:
             return DEFAULT_ALARM_TIME
-        return { "alarm_time": f"{calc_alarm_time}:00"}
+        return { "alarm_time": f"{calc_alarm_time}"}
 
     return {"message":"shouldn't be here"}
 
