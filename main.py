@@ -82,8 +82,7 @@ async def alarm_time(date: str):
     requested_date = time.strptime(date, "%Y%m%d")
 
     # Check if the requested date is valid for calculating the alarm time
-    if (requested_date.tm_hour > 9
-            or slept_clock_time.tm_yday >= requested_date.tm_yday
+    if (slept_clock_time.tm_yday >= requested_date.tm_yday
             or slept_clock_time.tm_yday < (requested_date.tm_yday - 1)):
         return DEFAULT_ALARM_TIME
     else:
