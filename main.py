@@ -5,7 +5,9 @@ import os
 import os.path
 
 
+# Default alarm time to be used if no specific alarm time is calculated
 DEFAULT_ALARM_TIME = {"alarm_time": "9:00"}
+# Path to the log file where sleep times are recorded
 SLEEPS_LOG_PATH = os.getenv("SLEEPS_LOG_PATH", "data/sleeps.log")
 
 app = FastAPI()
@@ -13,16 +15,27 @@ app = FastAPI()
 
 @app.get("/")
 async def root():
+    """
+    Root endpoint that returns a simple greeting message.
+    """
     return {"message": "Hello World"}
 
 
 @app.get("/hello/{name}")
 async def say_hello(name: str):
+    """
+    Endpoint that returns a personalized greeting message.
+    :param name: The name to include in the greeting message.
+    """
     return {"message": f"Hello {name}"}
 
 
 @app.post("/sleep")
 async def sleep():
+    """
+    Endpoint to log the current time as the time the user went to sleep.
+    Creates the log file if it does not exist.
+    """
     slept_at = time.time()
     # check_permissions(SLEEPS_LOG_PATH)
     if not os.path.exists(SLEEPS_LOG_PATH):
@@ -35,6 +48,10 @@ async def sleep():
 
 @app.get("/sleep/latest")
 async def latest_sleep():
+    """
+    Endpoint to retrieve the latest recorded sleep time.
+    Creates the log file if it does not exist.
+    """
     # check_permissions(SLEEPS_LOG_PATH)
     if not os.path.exists(SLEEPS_LOG_PATH):
         os.makedirs(os.path.dirname(SLEEPS_LOG_PATH), exist_ok=True)
@@ -51,6 +68,10 @@ async def latest_sleep():
 
 @app.get("/alarm/time/{date}")
 async def alarm_time(date: str):
+    """
+    Endpoint to calculate the alarm time based on the latest sleep time and the requested date.
+    :param date: The requested date in the format YYYYMMDD.
+    """
     slept_at = await latest_sleep()
 
     if slept_at is None or "latest_sleep" not in slept_at:
@@ -60,12 +81,14 @@ async def alarm_time(date: str):
     slept_clock_time = time.localtime(float(slept_at["latest_sleep"]))
     requested_date = time.strptime(date, "%Y%m%d")
 
+    # Check if the requested date is valid for calculating the alarm time
     if (requested_date.tm_hour > 9
             or slept_clock_time.tm_yday >= requested_date.tm_yday
             or slept_clock_time.tm_yday < (requested_date.tm_yday - 1)):
         return DEFAULT_ALARM_TIME
     else:
         slept_hour = slept_clock_time.tm_hour
+        # Determine the alarm time based on the hour the user went to sleep
         if 9 <= slept_hour <= 23:
             calc_alarm_time = "6:30"
         elif slept_hour >= 0 and (slept_hour + 7) < 9:
@@ -78,5 +101,8 @@ async def alarm_time(date: str):
 
 
 def start():
-    """Launched with `poetry run start` at root level"""
+    """
+    Launched with `poetry run start` at root level.
+    Starts the Uvicorn server to run the FastAPI application.
+    """
     uvicorn.run("main:app", reload=True)
