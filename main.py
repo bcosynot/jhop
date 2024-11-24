@@ -75,6 +75,7 @@ async def alarm_time(date: str):
     slept_at = await latest_sleep()
 
     if slept_at is None or "latest_sleep" not in slept_at:
+        print("couldn't find latest sleep time")
         return DEFAULT_ALARM_TIME
 
     # get 24 hour time from seconds from epoch
@@ -84,15 +85,19 @@ async def alarm_time(date: str):
     # Check if the requested date is valid for calculating the alarm time
     if (slept_clock_time.tm_yday >= requested_date.tm_yday
             or slept_clock_time.tm_yday < (requested_date.tm_yday - 1)):
+        print("invalid date")
         return DEFAULT_ALARM_TIME
     else:
         slept_hour = slept_clock_time.tm_hour
         # Determine the alarm time based on the hour the user went to sleep
         if 9 <= slept_hour <= 23:
+            print("slept early enough")
             calc_alarm_time = "6:30"
         elif slept_hour >= 0 and (slept_hour + 7) < 9:
-            calc_alarm_time = f"{slept_hour + 7}:00"
+            print("gotta sleep 7 hours")
+            calc_alarm_time = f"{slept_hour + 7}:{slept_clock_time.tm_min}"
         else:
+            print("couldn't recognize case. use default.")
             return DEFAULT_ALARM_TIME
         return { "alarm_time": f"{calc_alarm_time}"}
 
