@@ -37,13 +37,17 @@ async def sleep():
     Creates the log file if it does not exist.
     """
     slept_at = time.time()
+    slept_clock_time = time.localtime(float(slept_at))
     # check_permissions(SLEEPS_LOG_PATH)
     if not os.path.exists(SLEEPS_LOG_PATH):
         os.makedirs(os.path.dirname(SLEEPS_LOG_PATH), exist_ok=True)
-        open(SLEEPS_LOG_PATH, 'a').close()
+        with open(SLEEPS_LOG_PATH, 'a') as file:
+            # write two empty lines so reading becomes easier
+            file.write("\n")
+            file.write("\n")
     with open(SLEEPS_LOG_PATH, "a") as file:
         file.write(f"{slept_at}\n")
-    return {"message": "Good night!", "slept_at": slept_at}
+    return {"message": "Good night!", "slept_at": slept_at, "slept_clock_time": slept_clock_time}
 
 
 @app.get("/sleep/latest")
@@ -63,7 +67,8 @@ async def latest_sleep():
         while file.read(1) != b'\n':  # Until EOL is found...
             file.seek(-2, 1)  # ...jump back the read byte plus one more.
         last_line = file.readline().decode().strip()  # Read last line.
-    return {"latest_sleep": last_line}
+    slept_clock_time = time.localtime(float(last_line))
+    return {"latest_sleep": last_line, "slept_clock_time": slept_clock_time}
 
 
 @app.get("/alarm/time/{date}")
@@ -74,34 +79,40 @@ async def alarm_time(date: str):
     """
     slept_at = await latest_sleep()
 
+    requested_date = time.strptime(date, "%Y%m%d")
     if slept_at is None or "latest_sleep" not in slept_at:
         print("couldn't find latest sleep time")
-        return DEFAULT_ALARM_TIME
+        return {**DEFAULT_ALARM_TIME, "reason": "No sleep time found", "slept_clock_time": "None", "requested_date": requested_date}
 
     # get 24 hour time from seconds from epoch
     slept_clock_time = time.localtime(float(slept_at["latest_sleep"]))
-    requested_date = time.strptime(date, "%Y%m%d")
 
     # Check if the requested date is valid for calculating the alarm time
-    if (slept_clock_time.tm_yday >= requested_date.tm_yday
-            or slept_clock_time.tm_yday < (requested_date.tm_yday - 1)):
+    slept_after_requested_day = slept_clock_time.tm_yday > requested_date.tm_yday
+    slept_before_one_day_requested_day = slept_clock_time.tm_yday < requested_date.tm_yday - 1
+    if slept_after_requested_day or slept_before_one_day_requested_day:
         print("invalid date")
-        return DEFAULT_ALARM_TIME
+        return {**DEFAULT_ALARM_TIME, "reason": "Invalid date", "slept_clock_time": slept_clock_time, "requested_date": requested_date}
     else:
         slept_hour = slept_clock_time.tm_hour
         # Determine the alarm time based on the hour the user went to sleep
         if 9 <= slept_hour <= 23:
-            print("slept early enough")
             calc_alarm_time = "6:30"
+            reason = "Slept early enough, default to earliest time"
         elif slept_hour >= 0 and (slept_hour + 7) < 9:
-            print("gotta sleep 7 hours")
-            calc_alarm_time = f"{slept_hour + 7}:{slept_clock_time.tm_min}"
+            if slept_clock_time.tm_yday == requested_date.tm_yday:
+                # slept after midnight
+                minute = slept_clock_time.tm_min if slept_clock_time.tm_min >= 10 else f"0{slept_clock_time.tm_min}"
+                calc_alarm_time = f"{slept_hour + 7}:{minute}"
+                reason = "gotta sleep 7 hours"
+            else:
+                reason = "Slept after midnight, but on another day"
+                return {**DEFAULT_ALARM_TIME, "reason": reason, "slept_clock_time": slept_clock_time, "requested_date": requested_date}
         else:
-            print("couldn't recognize case. use default.")
-            return DEFAULT_ALARM_TIME
-        return { "alarm_time": f"{calc_alarm_time}"}
+            reason = "couldn't recognize case. use default."
+            return {**DEFAULT_ALARM_TIME, "reason": reason, slept_clock_time: slept_clock_time}
+        return { "alarm_time": f"{calc_alarm_time}", "reason": reason, "slept_clock_time": slept_clock_time, "requested_date": requested_date }
 
-    return {"message":"shouldn't be here"}
 
 
 def start():
