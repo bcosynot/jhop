@@ -79,11 +79,20 @@
             packages = [ pkgs.poetry ];
           };
         };
+        # Defines available applications for the flake.
+        #
+        #     nix run
+        #
+        # Use this to run the default application defined below.
         apps = rec {
+
+          # Application named "start" created using flake-utils.lib.mkApp.
+          # It is based on the derivation pkgs.myapp.
           start = flake-utils.lib.mkApp {
             drv = pkgs.myapp;
             name = "start";
           };
+          # Default application, which references "start".
           default = start;
         };
         legacyPackages = pkgs;
