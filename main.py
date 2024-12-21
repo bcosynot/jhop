@@ -14,9 +14,11 @@ DEFAULT_ALARM_TIME = {"alarm_time": "09:00", "reason": "Using default alarm time
 JHOP_DB_PATH = os.getenv("JHOP_DB_PATH", "data/sleeps.db")
 NECESSARY_SLEEP_HOURS = 7
 
+
 class AlarmData(BaseModel):
     date: str
     time: str
+
 
 app = FastAPI()
 db_connection = None
@@ -71,7 +73,9 @@ def init_db():
     db_connection.commit()
     print("Tables created")
 
+
 init_db()
+
 
 @app.post("/sleep")
 async def sleep(sleep_type: str = None):
@@ -89,7 +93,8 @@ async def sleep(sleep_type: str = None):
         expected_duration = 60
     try:
         cursor = db_connection.cursor()
-        cursor.execute("INSERT INTO sleep_data (sleep_time, type, expected_duration) VALUES (?, ?, ?)", (slept_at, "night" if sleep_type is None else sleep_type, expected_duration, ))
+        cursor.execute("INSERT INTO sleep_data (sleep_time, type, expected_duration) VALUES (?, ?, ?)",
+                       (slept_at, "night" if sleep_type is None else sleep_type, expected_duration,))
         db_connection.commit()
 
         alarm_date, alarm_time_to_set = determine_alarm_time(slept_at, slept_clock_time, sleep_type, expected_duration)
@@ -103,6 +108,7 @@ async def sleep(sleep_type: str = None):
                 "alarm_date": alarm_date, "alarm_time_to_set": alarm_time_to_set, "sleep_type": sleep_type}
     except Error as e:
         return {"error": str(e)}
+
 
 def determine_alarm_time(slept_at, slept_clock_time, sleep_type, expected_duration):
     """
@@ -129,6 +135,8 @@ def determine_alarm_time(slept_at, slept_clock_time, sleep_type, expected_durati
         alarm_time_to_set = time.strftime("%H:%M", time.localtime(alarm_target_time))
 
     return alarm_date, alarm_time_to_set
+
+
 @app.get("/sleep/latest")
 async def latest_sleep():
     """
@@ -143,6 +151,76 @@ async def latest_sleep():
         slept_at = row[0]
         slept_clock_time = time.localtime(float(slept_at))
         return {"latest_sleep": slept_at, "slept_clock_time": slept_clock_time}
+    except Error as e:
+        return {"error": str(e)}
+
+
+@app.delete("/nap/latest")
+async def delete_latest_nap():
+    """
+    Deletes the latest recorded nap (either short or long nap) if it occurred in the last two hours,
+    including the associated alarm entry.
+    """
+    current_time = time.time()
+    try:
+        cursor = db_connection.cursor()
+        cursor.execute("""
+            SELECT id, sleep_time, type
+            FROM sleep_data
+            WHERE type IN ('short_nap', 'long_nap')
+            ORDER BY id DESC
+            LIMIT 1
+        """)
+        latest_nap = cursor.fetchone()
+        if latest_nap:
+            nap_id, nap_time, nap_type = latest_nap
+            if current_time - nap_time > 2 * 60 * 60:
+                return {"message": "Latest nap is older than 2 hours and cannot be deleted"}
+            # Delete nap entry
+            cursor.execute("""
+                DELETE FROM sleep_data WHERE id = ?
+            """, (nap_id,))
+            db_connection.commit()
+            # Delete associated alarm
+            nap_date = time.strftime("%Y%m%d", time.localtime(nap_time))
+            cursor.execute("""
+                DELETE FROM alarm_data
+                WHERE date = ?
+            """, (nap_date,))
+            db_connection.commit()
+            return {"message": "Latest nap and associated alarm deleted successfully"}
+        return {"message": "No naps found to delete"}
+    except Error as e:
+        return {"error": str(e)}
+    # Logic to delete naps
+    current_time = time.time()
+    try:
+        cursor.execute("""
+            SELECT id, sleep_time, type
+            FROM sleep_data
+            WHERE type IN ('short_nap', 'long_nap')
+            ORDER BY id DESC
+            LIMIT 1
+        """)
+        latest_nap = cursor.fetchone()
+        if latest_nap:
+            nap_id, nap_time, nap_type = latest_nap
+            if current_time - nap_time > 2 * 60 * 60:
+                return {"message": "Latest nap is older than 2 hours and cannot be deleted"}
+            cursor.execute("""
+                DELETE FROM sleep_data WHERE id = ?
+            """, (nap_id,))
+            db_connection.commit()
+            # Delete associated alarm
+            cursor.execute("""
+                DELETE FROM alarm_data
+                WHERE date = ?
+                AND alarm_time = (
+                    SELECT alarm_time FROM alarm_data ORDER BY id DESC LIMIT 1
+                )
+            """, (nap_time,))
+            db_connection.commit()
+            return {"message": "Latest nap and associated alarm deleted successfully"}
     except Error as e:
         return {"error": str(e)}
 
@@ -203,7 +281,8 @@ async def delete_alarm(alarm_data: AlarmData):
         if deleted_rows == 0:
             return {"message": "Alarm not found", "success": False}
         db_connection.commit()
-        return {"message": "Alarm deleted successfully", "success": True, "date": alarm_data.date, "alarm_time": alarm_data.time}
+        return {"message": "Alarm deleted successfully", "success": True, "date": alarm_data.date,
+                "alarm_time": alarm_data.time}
     except Error as e:
         return {"error": str(e)}
 
@@ -220,7 +299,8 @@ def calculate_alarm_time(slept_clock_time, requested_date):
     slept_minute = slept_clock_time.tm_min
     if 9 <= slept_hour < 23:
         return "06:30", "Slept early enough, default to earliest time"
-    elif slept_hour == 23 or (0 <= (slept_hour + NECESSARY_SLEEP_HOURS) < 9 and slept_clock_time.tm_yday == requested_date.tm_yday):
+    elif slept_hour == 23 or (
+            0 <= (slept_hour + NECESSARY_SLEEP_HOURS) < 9 and slept_clock_time.tm_yday == requested_date.tm_yday):
         minute = slept_minute if slept_minute >= 10 else f"0{slept_minute}"
         hour = (slept_hour + NECESSARY_SLEEP_HOURS) % 24
         hour = hour if hour >= 10 else f"0{hour}"
@@ -249,7 +329,6 @@ async def alarm_time(date: str) -> dict:
         requested_day = requested_date.tm_yday
         return slept_day > requested_day or slept_day < requested_day - 1
 
-
     try:
         cursor = db_connection.cursor()
     except Error as e:
@@ -277,7 +356,6 @@ async def alarm_time(date: str) -> dict:
     except Exception as e:
         return {"error": "Failed to fetch latest sleep time", "details": str(e)}
 
-
     if not isinstance(slept_at, dict) or "latest_sleep" not in slept_at:
         return {**DEFAULT_ALARM_TIME, "reason": "No sleep time found", "slept_clock_time": "None",
                 "requested_date": requested_date}
@@ -301,12 +379,14 @@ async def alarm_time(date: str) -> dict:
     return {**DEFAULT_ALARM_TIME, "reason": reason, "slept_clock_time": slept_clock_time,
             "requested_date": requested_date}
 
+
 def close_db():
     """
     Closes the database connection when the application stops.
     """
     if db_connection is not None:
         db_connection.close()
+
 
 def start():
     """
