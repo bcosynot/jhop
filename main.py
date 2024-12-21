@@ -41,9 +41,13 @@ async def say_hello(name: str):
 
 def init_db():
     global db_connection
+    print(f"Checking for db file at {JHOP_DB_PATH}...")
     if not os.path.exists(os.path.dirname(JHOP_DB_PATH)):
+        print(f"Creating db file at {JHOP_DB_PATH}...")
         os.makedirs(os.path.dirname(JHOP_DB_PATH), exist_ok=True)
+        print(f"Created db file at {JHOP_DB_PATH}...")
     db_connection = connect(JHOP_DB_PATH, check_same_thread=False)
+    print("Creating tables")
     cursor = db_connection.cursor()
     # Add table for capturing sleep start times
     cursor.execute("""
@@ -65,6 +69,7 @@ def init_db():
             )
         """)
     db_connection.commit()
+    print("Tables created")
 
 init_db()
 
