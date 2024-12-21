@@ -219,10 +219,12 @@ def calculate_alarm_time(slept_clock_time, requested_date):
     slept_hour = slept_clock_time.tm_hour
     slept_minute = slept_clock_time.tm_min
     if 9 <= slept_hour < 23:
-        return "6:30", "Slept early enough, default to earliest time"
+        return "06:30", "Slept early enough, default to earliest time"
     elif slept_hour == 23 or (0 <= (slept_hour + NECESSARY_SLEEP_HOURS) < 9 and slept_clock_time.tm_yday == requested_date.tm_yday):
-        minute = f"{slept_minute}"
-        return f"{slept_hour + 7}:{minute}", "Slept after midnight, calculated 7 hours"
+        minute = slept_minute if slept_minute >= 10 else f"0{slept_minute}"
+        hour = (slept_hour + NECESSARY_SLEEP_HOURS) % 24
+        hour = hour if hour >= 10 else f"0{hour}"
+        return f"{hour}:{minute}", "Slept after midnight, calculated 7 hours"
     return None, "Couldn't recognize the case, using default."
 
 
