@@ -80,9 +80,8 @@ async def sleep(sleep_type: str = None):
     """
     slept_at = time.time()
     slept_clock_time = time.localtime(float(slept_at))
-    sleep_type = "night" if sleep_type is None else sleep_type # for backwards compatibility
     expected_duration = 0
-    if sleep_type == "night":
+    if sleep_type is None or sleep_type == "night":
         expected_duration = 7 * 60
     elif sleep_type == "short_nap":
         expected_duration = 30
@@ -90,30 +89,10 @@ async def sleep(sleep_type: str = None):
         expected_duration = 60
     try:
         cursor = db_connection.cursor()
-        cursor.execute("INSERT INTO sleep_data (sleep_time, type, expected_duration) VALUES (?, ?, ?)", (slept_at, sleep_type, expected_duration, ))
+        cursor.execute("INSERT INTO sleep_data (sleep_time, type, expected_duration) VALUES (?, ?, ?)", (slept_at, "night" if sleep_type is None else sleep_type, expected_duration, ))
         db_connection.commit()
 
-        # Now, set the alarm based on expected duration
-        if sleep_type == "night":
-            # Determine the alarm_date and alarm_time
-            # If the user went to sleep between midnight and 9 AM, the alarm_date is the same day
-            # Otherwise, the alarm_date is the next day
-            alarm_hour = slept_clock_time.tm_hour
-            if 0 <= alarm_hour < 9:
-                alarm_date = time.strftime("%Y%m%d", slept_clock_time)  # Same date as slept_clock_time
-            else:
-                alarm_date = time.strftime("%Y%m%d", time.localtime(slept_at + 24 * 60 * 60))  # Next day
-
-            # Calculate the alarm time based on sleep duration and logic
-            calculated_alarm_time, _ = calculate_alarm_time(slept_clock_time, time.strptime(alarm_date, "%Y%m%d"))
-            if calculated_alarm_time is None:
-                alarm_time_to_set = DEFAULT_ALARM_TIME["alarm_time"]
-            else:
-                alarm_time_to_set = calculated_alarm_time
-        else:
-            alarm_target_time = slept_at + (expected_duration * 60)
-            alarm_date = time.strftime("%Y%m%d", time.localtime(alarm_target_time))
-            alarm_time_to_set = time.strftime("%H:%M", time.localtime(alarm_target_time))
+        alarm_date, alarm_time_to_set = determine_alarm_time(slept_at, slept_clock_time, sleep_type, expected_duration)
 
         print(f"Setting alarm to {alarm_date} {alarm_time_to_set}")
         alarm_data = AlarmData(date=alarm_date, time=str(alarm_time_to_set))
@@ -125,7 +104,31 @@ async def sleep(sleep_type: str = None):
     except Error as e:
         return {"error": str(e)}
 
+def determine_alarm_time(slept_at, slept_clock_time, sleep_type, expected_duration):
+    """
+    Determines the appropriate alarm date and time based on sleep type and duration.
+    """
+    if sleep_type is None or sleep_type == "night":
+        # If the user went to sleep between midnight and 9 AM, the alarm_date is the same day
+        # Otherwise, the alarm_date is the next day
+        alarm_hour = slept_clock_time.tm_hour
+        if 0 <= alarm_hour < 9:
+            alarm_date = time.strftime("%Y%m%d", slept_clock_time)  # Same date as slept_clock_time
+        else:
+            alarm_date = time.strftime("%Y%m%d", time.localtime(slept_at + 24 * 60 * 60))  # Next day
 
+        # Calculate the alarm time based on sleep duration and logic
+        calculated_alarm_time, _ = calculate_alarm_time(slept_clock_time, time.strptime(alarm_date, "%Y%m%d"))
+        if calculated_alarm_time is None:
+            alarm_time_to_set = DEFAULT_ALARM_TIME["alarm_time"]
+        else:
+            alarm_time_to_set = calculated_alarm_time
+    else:
+        alarm_target_time = slept_at + (expected_duration * 60)
+        alarm_date = time.strftime("%Y%m%d", time.localtime(alarm_target_time))
+        alarm_time_to_set = time.strftime("%H:%M", time.localtime(alarm_target_time))
+
+    return alarm_date, alarm_time_to_set
 @app.get("/sleep/latest")
 async def latest_sleep():
     """
@@ -150,10 +153,7 @@ async def set_alarm(alarm_data: AlarmData):
     Endpoint to set an alarm for a specified date.
     :param alarm_data: The alarm data to set.
     """
-    if alarm_data.date is None or len(alarm_data.date) != 8:
-        raise HTTPException(status_code=400, detail="Invalid date")
-    if alarm_data.time is None or len(alarm_data.time) != 5:
-        raise HTTPException(status_code=400, detail="Invalid time")
+    await validate_alarm_input(alarm_data)
     # Convert provided str time to epoch
     provided_time_as_epoch = await get_provided_time_as_epoch(alarm_data)
     try:
@@ -187,10 +187,7 @@ async def delete_alarm(alarm_data: AlarmData):
     :return: Response indicating the success or failure of the deletion process.
     :rtype: JSONResponse
     """
-    if alarm_data.date is None or len(alarm_data.date) != 8:
-        raise HTTPException(status_code=400, detail="Invalid date")
-    if alarm_data.time is None or len(alarm_data.time) != 5:
-        raise HTTPException(status_code=400, detail="Invalid time")
+    await validate_alarm_input(alarm_data)
 
     provided_time_as_epoch = await get_provided_time_as_epoch(alarm_data)
     try:
@@ -209,6 +206,13 @@ async def delete_alarm(alarm_data: AlarmData):
         return {"message": "Alarm deleted successfully", "success": True, "date": alarm_data.date, "alarm_time": alarm_data.time}
     except Error as e:
         return {"error": str(e)}
+
+
+async def validate_alarm_input(alarm_data):
+    if alarm_data.date is None or len(alarm_data.date) != 8:
+        raise HTTPException(status_code=400, detail=f"Invalid date. Provided date: {alarm_data.date}")
+    if alarm_data.time is None or len(alarm_data.time) != 5:
+        raise HTTPException(status_code=400, detail=f"Invalid time. Provided time: {alarm_data.time}")
 
 
 def calculate_alarm_time(slept_clock_time, requested_date):
