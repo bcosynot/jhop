@@ -264,8 +264,9 @@ async def alarm_time(date: str) -> dict:
     adjusted_time = (datetime.fromtimestamp(current_time) - timedelta(minutes=15)).timestamp()
     existing_alarm = fetch_existing_alarm(cursor, date, adjusted_time)
     if existing_alarm is not None:
+        formatted_alarm_time = time.strftime("%H:%M", time.localtime(existing_alarm[0]))
         return {
-            "alarm_time": existing_alarm[0],
+            "alarm_time": formatted_alarm_time,
             "requested_date": requested_date,
             "reason": "Existing alarm",
         }
